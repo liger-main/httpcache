@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -25,17 +24,19 @@ const (
 
 // CacheHandler custom plugable' struct of implementation of the http.RoundTripper
 type CacheHandler struct {
+	l                   Logger
 	DefaultRoundTripper http.RoundTripper
 	CacheInteractor     cache.ICacheInteractor
 	ComplyRFC           bool
 }
 
 // NewCacheHandlerRoundtrip will create an implementations of cache http roundtripper
-func NewCacheHandlerRoundtrip(defaultRoundTripper http.RoundTripper, rfcCompliance bool, cacheActor cache.ICacheInteractor) *CacheHandler {
+func NewCacheHandlerRoundtrip(defaultRoundTripper http.RoundTripper, rfcCompliance bool, cacheActor cache.ICacheInteractor, l Logger) *CacheHandler {
 	if cacheActor == nil {
-		log.Fatal("cache storage is not well set")
+		panic("cache storage is not well set")
 	}
 	return &CacheHandler{
+		l:                   l,
 		DefaultRoundTripper: defaultRoundTripper,
 		CacheInteractor:     cacheActor,
 		ComplyRFC:           rfcCompliance,
@@ -103,7 +104,7 @@ func (r *CacheHandler) roundTripRFCCompliance(req *http.Request) (resp *http.Res
 		}
 		// if error when getting from cachce, ignore it, re-try a live version
 		if cachedErr != nil {
-			log.Println(cachedErr, "failed to retrieve from cache, trying with a live version")
+			r.l.Debugf("failed to retrieve from cache, trying with a live version: %v", cachedErr)
 		}
 	}
 
@@ -114,24 +115,24 @@ func (r *CacheHandler) roundTripRFCCompliance(req *http.Request) (resp *http.Res
 
 	validationResult, errValidation := validateTheCacheControl(req, resp)
 	if errValidation != nil {
-		log.Printf("Can't validate the response to RFC 7234, plase check. Err: %v\n", errValidation)
+		r.l.Debugf("Can't validate the response to RFC 7234, plase check. Err: %v\n", errValidation)
 		return // return directly, not sure can be stored or not
 	}
 
 	if validationResult.OutErr != nil {
-		log.Printf("Can't validate the response to RFC 7234, plase check. Err: %v\n", validationResult.OutErr)
+		r.l.Debugf("Can't validate the response to RFC 7234, plase check. Err: %v\n", validationResult.OutErr)
 		return // return directly, not sure can be stored or not
 	}
 
 	// reasons to not to cache
 	if len(validationResult.OutReasons) > 0 {
-		log.Printf("Can't validate the response to RFC 7234, plase check. Err: %v\n", validationResult.OutReasons)
+		r.l.Debugf("Can't validate the response to RFC 7234, plase check. Err: %v\n", validationResult.OutReasons)
 		return // return directly, not sure can be stored or not.
 	}
 
 	err = storeRespToCache(r.CacheInteractor, req, resp)
 	if err != nil {
-		log.Printf("Can't store the response to database, plase check. Err: %v\n", err)
+		r.l.Debugf("Can't store the response to database, plase check. Err: %v\n", err)
 	}
 	// return err back to nil to make the call still success.
 	return resp, nil
@@ -147,9 +148,9 @@ func (r *CacheHandler) RoundTrip(req *http.Request) (resp *http.Response, err er
 		buildTheCachedResponseHeader(cachedResp, cachedItem, r.CacheInteractor.Origin())
 		return cachedResp, cachedErr
 	}
-	// if error when getting from cachce, ignore it, re-try a live version
+	// if error when getting from cache, ignore it, re-try a live version
 	if cachedErr != nil {
-		log.Println(cachedErr, "failed to retrieve from cache, trying with a live version")
+		r.l.Debugf("failed to retrieve from cache, trying with a live version: %v", cachedErr)
 	}
 
 	resp, err = r.DefaultRoundTripper.RoundTrip(req)
@@ -159,7 +160,7 @@ func (r *CacheHandler) RoundTrip(req *http.Request) (resp *http.Response, err er
 
 	err = storeRespToCache(r.CacheInteractor, req, resp)
 	if err != nil {
-		log.Printf("Can't store the response to database, plase check. Err: %v\n", err)
+		r.l.Debugf("Can't store the response to database, plase check. Err: %v\n", err)
 		err = nil // set err back to nil to make the call still success.
 	}
 	return
