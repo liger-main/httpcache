@@ -8,7 +8,6 @@ import (
 	"github.com/alicebob/miniredis"
 	"github.com/bxcodec/httpcache/cache"
 	rediscache "github.com/bxcodec/httpcache/cache/redis"
-	"github.com/go-redis/redis/v8"
 )
 
 func TestCacheRedis(t *testing.T) {

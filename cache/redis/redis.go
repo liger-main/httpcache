@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/bxcodec/httpcache/cache"
-	"github.com/go-redis/redis/v8"
 )
 
 // CacheOptions for storing data for Redis connections

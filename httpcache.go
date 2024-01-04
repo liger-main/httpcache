@@ -9,7 +9,6 @@ import (
 	"github.com/bxcodec/httpcache/cache"
 	"github.com/bxcodec/httpcache/cache/inmem"
 	rediscache "github.com/bxcodec/httpcache/cache/redis"
-	"github.com/go-redis/redis/v8"
 	"golang.org/x/net/context"
 )
 
